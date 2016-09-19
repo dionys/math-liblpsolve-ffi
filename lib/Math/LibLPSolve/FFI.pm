@@ -31,10 +31,11 @@ use namespace::clean;
     my $ffi = _ffi();
 
     for (
-        [delete_lp => ['int']                     => 'void'],
-        [make_lp   => ['int', 'int']              => 'int'],
-        [read_LP   => ['string', 'int', 'string'] => 'int'],
-        [solve     => ['int']                     => 'int'],
+        [copy_lp   => ['uint']                     => 'uint'],
+        [delete_lp => ['uint']                     => 'void'],
+        [make_lp   => ['uint', 'uint']             => 'uint'],
+        [read_LP   => ['string', 'uint', 'string'] => 'uint'],
+        [solve     => ['uint']                     => 'uint'],
     ) {
         $ffi->attach([$_->[0] => '_ffi_' . $_->[0]] => @$_[1 .. $#$_]);
     }
@@ -42,32 +43,44 @@ use namespace::clean;
 
 sub new {
     my $proto = shift();
-    my $self  = bless({}, ref($proto) || $proto);
     my %args  = @_;
+    my $lps;
 
     if ($args{file}) {
-        $self->{lp} = _ffi_read_LP($args{file}, 6, undef);
+        $lps = _ffi_read_LP($args{file}, 6, undef);
     }
     else {
-        $self->{lp} = _ffi_make_lp(0, 0);
+        $lps = _ffi_make_lp(0, 0);
     }
 
-    return $self;
+    return unless $lps;
+    return bless(\$lps, ref($proto) || $proto);
 }
 
 sub DESTROY {
     my ($self) = @_;
 
-    _ffi_delete_lp($self->{lp});
-    undef($self->{lp});
+    _ffi_delete_lp($$self);
+    undef($$self);
 
     return;
 }
 
+sub clone {
+    my ($self) = @_;
+
+    my $lps = _ffi_copy_lp($$self);
+
+    return unless $lps;
+    return bless(\$lps, ref($self));
+}
+
+*copy = \&clone;
+
 sub solve {
     my ($self) = @_;
 
-    my $ret = _ffi_solve($self->{lp});
+    my $ret = _ffi_solve($$self);
 
     return $ret;
 }
