@@ -9,6 +9,31 @@ use FFI::Platypus ();
 
 use namespace::clean;
 
+use Exporter qw(import);
+
+
+our %EXPORT_TAGS = (
+    constants => [qw(
+        VERBOSE_NEUTRAL
+        VERBOSE_CRITICAL
+        VERBOSE_SEVERE
+        VERBOSE_IMPORTANT
+        VERBOSE_NORMAL
+        VERBOSE_DETAILED
+        VERBOSE_FULL
+    )],
+);
+our @EXPORT = map { @$_ } values(%EXPORT_TAGS);
+
+
+use constant VERBOSE_NEUTRAL   => 0;
+use constant VERBOSE_CRITICAL  => 1;
+use constant VERBOSE_SEVERE    => 2;
+use constant VERBOSE_IMPORTANT => 3;
+use constant VERBOSE_NORMAL    => 4;
+use constant VERBOSE_DETAILED  => 5;
+use constant VERBOSE_FULL      => 6;
+
 
 {
     my $ffi;
@@ -31,11 +56,14 @@ use namespace::clean;
     my $ffi = _ffi();
 
     for (
-        [copy_lp   => ['uint']                     => 'uint'],
-        [delete_lp => ['uint']                     => 'void'],
-        [make_lp   => ['uint', 'uint']             => 'uint'],
-        [read_LP   => ['string', 'uint', 'string'] => 'uint'],
-        [solve     => ['uint']                     => 'uint'],
+        [copy_lp     => ['uint']                    => 'uint'],
+        [delete_lp   => ['uint']                    => 'void'],
+        [get_verbose => ['uint']                    => 'int'],
+        [make_lp     => ['int', 'int']              => 'uint'],
+        [read_LP     => ['string', 'int', 'string'] => 'uint'],
+#        [read_lp   => ['uint', 'uint', 'string']   => 'uint'],
+        [set_verbose => ['uint', 'int']             => 'void'],
+        [solve       => ['uint']                    => 'uint'],
     ) {
         $ffi->attach([$_->[0] => '_ffi_' . $_->[0]] => @$_[1 .. $#$_]);
     }
@@ -43,17 +71,25 @@ use namespace::clean;
 
 sub new {
     my $proto = shift();
+    my $file  = @_ % 2 ? shift() : undef;
     my %args  = @_;
     my $lps;
 
-    if ($args{file}) {
-        $lps = _ffi_read_LP($args{file}, 6, undef);
+    $args{verbose} = VERBOSE_NORMAL unless (defined($args{verbose}));
+
+    if ($file) {
+        $lps = _ffi_read_LP($file, $args{verbose}, undef);
+
+        return unless $lps;
     }
     else {
         $lps = _ffi_make_lp(0, 0);
+
+        return unless $lps;
+
+        _ffi_set_verbose($args{verbose});
     }
 
-    return unless $lps;
     return bless(\$lps, ref($proto) || $proto);
 }
 
@@ -83,6 +119,16 @@ sub solve {
     my $ret = _ffi_solve($$self);
 
     return $ret;
+}
+
+sub verbose {
+    my ($self) = @_;
+
+    if (@_ > 1) {
+        _ffi_set_verbose($$self, $_[1]);
+    }
+
+    return _ffi_get_verbose($$self);
 }
 
 
