@@ -59,9 +59,13 @@ use constant VERBOSE_FULL      => 6;
         [copy_lp     => ['uint']                    => 'uint'],
         [delete_lp   => ['uint']                    => 'void'],
         [get_verbose => ['uint']                    => 'int'],
+        [is_debug    => ['uint']                    => 'char'],
+        [is_trace    => ['uint']                    => 'char'],
         [make_lp     => ['int', 'int']              => 'uint'],
         [read_LP     => ['string', 'int', 'string'] => 'uint'],
 #        [read_lp   => ['uint', 'uint', 'string']   => 'uint'],
+        [set_debug   => ['uint', 'char']            => 'void'],
+        [set_trace   => ['uint', 'char']            => 'void'],
         [set_verbose => ['uint', 'int']             => 'void'],
         [solve       => ['uint']                    => 'uint'],
     ) {
@@ -90,6 +94,9 @@ sub new {
         _ffi_set_verbose($args{verbose});
     }
 
+    _ffi_set_debug($lps, 1) if $args{is_debug};
+    _ffi_set_trace($lps, 1) if $args{is_trace};
+
     return bless(\$lps, ref($proto) || $proto);
 }
 
@@ -113,6 +120,17 @@ sub clone {
 
 *copy = \&clone;
 
+sub is_debug {
+    my ($self) = @_;
+
+    if (@_ > 1) {
+        _ffi_set_debug($$self, !!$_[1]);
+    }
+
+    return unless defined(wantarray());
+    return _ffi_is_debug($$self);
+}
+
 sub solve {
     my ($self) = @_;
 
@@ -128,6 +146,7 @@ sub verbose {
         _ffi_set_verbose($$self, $_[1]);
     }
 
+    return unless defined(wantarray());
     return _ffi_get_verbose($$self);
 }
 
