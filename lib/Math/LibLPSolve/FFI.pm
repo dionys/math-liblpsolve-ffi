@@ -6,6 +6,7 @@ use warnings;
 use File::Spec::Functions qw(catdir);
 use FFI::CheckLib ();
 use FFI::Platypus ();
+use XS::Typemap ();
 
 use namespace::clean;
 
@@ -62,8 +63,8 @@ use constant VERBOSE_FULL      => 6;
         [is_debug    => ['uint']                    => 'char'],
         [is_trace    => ['uint']                    => 'char'],
         [make_lp     => ['int', 'int']              => 'uint'],
+        [print_lp    => ['uint']                    => 'void'],
         [read_LP     => ['string', 'int', 'string'] => 'uint'],
-#        [read_lp   => ['uint', 'uint', 'string']   => 'uint'],
         [set_debug   => ['uint', 'char']            => 'void'],
         [set_trace   => ['uint', 'char']            => 'void'],
         [set_verbose => ['uint', 'int']             => 'void'],
@@ -81,17 +82,16 @@ sub new {
 
     $args{verbose} = VERBOSE_NORMAL unless (defined($args{verbose}));
 
-    if ($file) {
-        $lps = _ffi_read_LP($file, $args{verbose}, undef);
-
-        return unless $lps;
-    }
-    else {
+    unless (defined($file)) {
         $lps = _ffi_make_lp(0, 0);
 
         return unless $lps;
 
         _ffi_set_verbose($args{verbose});
+    else {
+        $lps = _ffi_read_LP($file, $args{verbose}, undef);
+
+        return unless $lps;
     }
 
     _ffi_set_debug($lps, 1) if $args{is_debug};
@@ -119,6 +119,11 @@ sub clone {
 }
 
 *copy = \&clone;
+
+sub dump {
+    _ffi_print_lp(${$_[0]});
+    return;
+}
 
 sub is_debug {
     my ($self) = @_;
