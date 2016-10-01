@@ -6,7 +6,7 @@ use warnings;
 use File::Spec::Functions qw(catdir);
 use FFI::CheckLib ();
 use FFI::Platypus ();
-use XS::Typemap ();
+use Scalar::Util qw(looks_like_number);
 
 use namespace::clean;
 
@@ -57,18 +57,24 @@ use constant VERBOSE_FULL      => 6;
     my $ffi = _ffi();
 
     for (
-        [copy_lp     => ['uint']                    => 'uint'],
-        [delete_lp   => ['uint']                    => 'void'],
-        [get_verbose => ['uint']                    => 'int'],
-        [is_debug    => ['uint']                    => 'char'],
-        [is_trace    => ['uint']                    => 'char'],
-        [make_lp     => ['int', 'int']              => 'uint'],
-        [print_lp    => ['uint']                    => 'void'],
-        [read_LP     => ['string', 'int', 'string'] => 'uint'],
-        [set_debug   => ['uint', 'char']            => 'void'],
-        [set_trace   => ['uint', 'char']            => 'void'],
-        [set_verbose => ['uint', 'int']             => 'void'],
-        [solve       => ['uint']                    => 'uint'],
+        [copy_lp           => ['uint']                    => 'uint'],
+        [delete_lp         => ['uint']                    => 'void'],
+        [get_Ncolumns      => ['uint']                    => 'int'],
+        [get_Norig_columns => ['uint']                    => 'int'],
+        [get_Norig_rows    => ['uint']                    => 'int'],
+        [get_Nrows         => ['uint']                    => 'int'],
+        [get_verbose       => ['uint']                    => 'int'],
+        [is_debug          => ['uint']                    => 'char'],
+        [is_trace          => ['uint']                    => 'char'],
+        [make_lp           => ['int', 'int']              => 'uint'],
+        [print_lp          => ['uint']                    => 'void'],
+        [read_LP           => ['string', 'int', 'string'] => 'uint'],
+        [resize_lp         => ['uint', 'int', 'int']      => 'unsigned char'],
+        [set_debug         => ['uint', 'char']            => 'void'],
+        [set_trace         => ['uint', 'char']            => 'void'],
+        [set_verbose       => ['uint', 'int']             => 'void'],
+        [solve             => ['uint']                    => 'uint'],
+        [write_lp          => ['uint', 'string']          => 'unsigned char'],
     ) {
         $ffi->attach([$_->[0] => '_ffi_' . $_->[0]] => @$_[1 .. $#$_]);
     }
@@ -76,22 +82,27 @@ use constant VERBOSE_FULL      => 6;
 
 sub new {
     my $proto = shift();
-    my $file  = @_ % 2 ? shift() : undef;
     my %args  = @_;
     my $lps;
 
     $args{verbose} = VERBOSE_NORMAL unless (defined($args{verbose}));
 
-    unless (defined($file)) {
-        $lps = _ffi_make_lp(0, 0);
+    if (exists($args{file})) {
+        $lps = _ffi_read_LP('' . $args{file}, $args{verbose}, undef);
 
         return unless $lps;
-
-        _ffi_set_verbose($args{verbose});
+    }
     else {
-        $lps = _ffi_read_LP($file, $args{verbose}, undef);
+        for (qw(rows columns)) {
+            $args{$_} = 0 unless exists($args{$_}) && looks_like_number($args{$_}) && $args{$_} >= 0;
+            $args{$_} = int($args{$_});
+        }
+
+        $lps = _ffi_make_lp($args{rows}, $args{columns});
 
         return unless $lps;
+
+        _ffi_set_verbose($lps, $args{verbose});
     }
 
     _ffi_set_debug($lps, 1) if $args{is_debug};
@@ -136,6 +147,42 @@ sub is_debug {
     return _ffi_is_debug($$self);
 }
 
+sub number_of_columns {
+    return _ffi_get_Ncolumns(${$_[0]});
+}
+
+sub number_of_original_columns {
+    return _ffi_get_Norig_columns(${$_[0]});
+}
+
+sub number_of_original_rows {
+    return _ffi_get_Norig_rows(${$_[0]});
+}
+
+sub number_of_rows {
+    return _ffi_get_Nrows(${$_[0]});
+}
+
+sub resize {
+    my $self = shift();
+
+    return 1 unless @_;
+
+    my %args = @_;
+
+    for (qw(rows columns)) {
+        unless (exists($args{$_}) && looks_like_number($args{$_}) && $args{$_} >= 0) {
+            no strict 'refs';
+            $args{$_} = (my $meth = 'number_of_' . $_)->($self);
+        }
+        else {
+            $args{$_} = int($args{$_});
+        }
+    }
+
+    return _ffi_resize_lp($$self, $args{rows}, $args{columns});
+}
+
 sub solve {
     my ($self) = @_;
 
@@ -153,6 +200,12 @@ sub verbose {
 
     return unless defined(wantarray());
     return _ffi_get_verbose($$self);
+}
+
+sub write {
+    my ($self) = @_;
+
+    return _ffi_write_lp($$self, $_[1]);
 }
 
 
