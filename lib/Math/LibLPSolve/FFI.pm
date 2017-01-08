@@ -4,6 +4,7 @@ use strict;
 use warnings;
 
 use File::Spec::Functions qw(catdir);
+use File::Temp qw(tempfile);
 use FFI::CheckLib ();
 use FFI::Platypus ();
 use Scalar::Util qw(looks_like_number);
@@ -87,7 +88,19 @@ sub new {
 
     $args{verbose} = VERBOSE_NORMAL unless (defined($args{verbose}));
 
-    if (exists($args{file})) {
+    if (exists($args{model})) {
+        my ($fh, $fn) = tempfile('lpXXXXXX', SUFFIX => '.lp', TMPDIR => 1, UNLINK => 1);
+
+        binmode($fh, ':utf8');
+        print($fh $args{model});
+
+        $lps = _ffi_read_LP($fn, $args{verbose}, undef);
+
+        unlink($args{file});
+
+        return unless $lps;
+    }
+    elsif (exists($args{file})) {
         $lps = _ffi_read_LP('' . $args{file}, $args{verbose}, undef);
 
         return unless $lps;
