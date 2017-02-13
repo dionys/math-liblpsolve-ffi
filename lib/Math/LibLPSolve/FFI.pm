@@ -16,6 +16,18 @@ use Exporter qw(import);
 
 our %EXPORT_TAGS = (
     constants => [qw(
+        STATUS_NOMEMORY
+        STATUS_OPTIMAL
+        STATUS_SUBOPTIMAL
+        STATUS_INFEASIBLE
+        STATUS_UNBOUNDED
+        STATUS_DEGENERATE
+        STATUS_NUMFAILURE
+        STATUS_USERABORT
+        STATUS_TIMEOUT
+        STATUS_PRESOLVED
+        STATUS_ACCURACYERROR
+
         VERBOSE_NEUTRAL
         VERBOSE_CRITICAL
         VERBOSE_SEVERE
@@ -27,6 +39,23 @@ our %EXPORT_TAGS = (
 );
 our @EXPORT = map { @$_ } values(%EXPORT_TAGS);
 
+
+use constant STATUS_UNKNOWNERROR  => -5;
+use constant STATUS_DATAIGNORED   => -4;
+use constant STATUS_NOBFP         => -3;
+use constant STATUS_NOMEMORY      => -2;
+use constant STATUS_NOTRUN        => -1;
+use constant STATUS_OPTIMAL       =>  0;
+use constant STATUS_SUBOPTIMAL    =>  1;
+use constant STATUS_INFEASIBLE    =>  2;
+use constant STATUS_UNBOUNDED     =>  3;
+use constant STATUS_DEGENERATE    =>  4;
+use constant STATUS_NUMFAILURE    =>  5;
+use constant STATUS_USERABORT     =>  6;
+use constant STATUS_TIMEOUT       =>  7;
+use constant STATUS_RUNNING       =>  8;
+use constant STATUS_PRESOLVED     =>  9;
+use constant STATUS_ACCURACYERROR => 25;
 
 use constant VERBOSE_NEUTRAL   => 0;
 use constant VERBOSE_CRITICAL  => 1;
@@ -64,6 +93,8 @@ use constant VERBOSE_FULL      => 6;
         [get_Norig_columns => ['uint']                    => 'int'],
         [get_Norig_rows    => ['uint']                    => 'int'],
         [get_Nrows         => ['uint']                    => 'int'],
+        [get_status        => ['uint']                    => 'int'],
+        [get_statustext    => ['uint', 'int']             => 'string'],
         [get_var_primalresult => ['uint', 'int']          => 'double'],
         [get_verbose       => ['uint']                    => 'int'],
         [is_debug          => ['uint']                    => 'char'],
@@ -158,6 +189,10 @@ sub dump_solution {
     return;
 }
 
+sub get_status_text {
+    return _ffi_get_statustext(${$_[0]}, $_[1]);
+}
+
 sub is_debug {
     my ($self) = @_;
 
@@ -187,6 +222,8 @@ sub number_of_rows {
 
 sub primal_solution {
     my ($self) = @_;
+
+    return if $self->status == STATUS_NOTRUN;
 
     my @sol;
     my $rows = $self->number_of_rows;
@@ -223,7 +260,16 @@ sub solve {
 
     my $ret = _ffi_solve($$self);
 
-    return $ret;
+    return unless $ret == STATUS_OPTIMAL;
+    return $self->primal_solution;
+}
+
+sub status {
+    return _ffi_get_status(${$_[0]});
+}
+
+sub status_text {
+    return $_[0]->get_status_text($_[0]->status);
 }
 
 sub verbose {
