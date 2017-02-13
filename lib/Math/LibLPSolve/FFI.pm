@@ -64,17 +64,19 @@ use constant VERBOSE_FULL      => 6;
         [get_Norig_columns => ['uint']                    => 'int'],
         [get_Norig_rows    => ['uint']                    => 'int'],
         [get_Nrows         => ['uint']                    => 'int'],
+        [get_var_primalresult => ['uint', 'int']          => 'double'],
         [get_verbose       => ['uint']                    => 'int'],
         [is_debug          => ['uint']                    => 'char'],
         [is_trace          => ['uint']                    => 'char'],
         [make_lp           => ['int', 'int']              => 'uint'],
         [print_lp          => ['uint']                    => 'void'],
+        [print_solution    => ['uint', 'int']             => 'void'],
         [read_LP           => ['string', 'int', 'string'] => 'uint'],
         [resize_lp         => ['uint', 'int', 'int']      => 'unsigned char'],
         [set_debug         => ['uint', 'char']            => 'void'],
         [set_trace         => ['uint', 'char']            => 'void'],
         [set_verbose       => ['uint', 'int']             => 'void'],
-        [solve             => ['uint']                    => 'uint'],
+        [solve             => ['uint']                    => 'int'],
         [write_lp          => ['uint', 'string']          => 'unsigned char'],
     ) {
         $ffi->attach([$_->[0] => '_ffi_' . $_->[0]] => @$_[1 .. $#$_]);
@@ -146,6 +148,13 @@ sub clone {
 
 sub dump {
     _ffi_print_lp(${$_[0]});
+
+    return;
+}
+
+sub dump_solution {
+    _ffi_print_solution(${$_[0]}, 1);
+
     return;
 }
 
@@ -174,6 +183,19 @@ sub number_of_original_rows {
 
 sub number_of_rows {
     return _ffi_get_Nrows(${$_[0]});
+}
+
+sub primal_solution {
+    my ($self) = @_;
+
+    my @sol;
+    my $rows = $self->number_of_rows;
+
+    for (($rows + 1) .. ($rows + $self->number_of_columns)) {
+        push(@sol, _ffi_get_var_primalresult($$self, $_));
+    }
+
+    return \@sol;
 }
 
 sub resize {
